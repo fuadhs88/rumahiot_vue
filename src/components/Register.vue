@@ -4,6 +4,9 @@
           <v-card>
             <v-card-media src="/static/img/other/technology-3092486_640.jpg" height="200px">
             </v-card-media>
+            <v-alert color="success" icon="new_releases" :value="true">
+              This is a success alert with a custom icon.
+            </v-alert>
             <v-card-title primary-title>
               <div>
                 <h3 class="headline mb-0">Registrasi</h3>
@@ -11,7 +14,7 @@
               </div>
             </v-card-title>
             <v-container>
-              <v-form v-model="valid">
+              <v-form v-model="valid" ref="form" lazy-validation>
                 <v-text-field
                   name="full_name"
                   label="Nama Lengkap"
@@ -48,8 +51,13 @@
                   :rules="[() => !!retypePassword || 'Harap masukkan kembali password yang akan digunakan',() => password == retypePassword || 'Kedua password tidak sama',() => password.length <= 50 || 'Password tidak dapat lebih 50 karakter']"
                   counter
                 ></v-text-field>
-                <div class="g-recaptcha" data-sitekey="6Leimz8UAAAAAOROGyNnlZKjfJW_bFzqXUXodgez"></div>
-                <v-btn block @click="submit" :disabled="!valid" large active-class color="primary">Daftar</v-btn>
+                <vue-recaptcha  ref="invisibleRecaptcha"
+                                @verify="onVerify"
+                                @expired="onExpired"
+                                size="invisible"
+                                :sitekey=sitekey>
+                <v-btn block :disabled="!valid" large active-class color="primary">Daftar</v-btn>
+                </vue-recaptcha>
               </v-form>
             </v-container>
           </v-card>
@@ -59,7 +67,7 @@
 
 <script>
   import axios from 'axios'
-
+  import VueRecaptcha from 'vue-recaptcha'
   export default {
     data: () => {
       return {
@@ -69,25 +77,40 @@
         // show/hide password icon
         p1: true,
         p2: true,
-        valid: false
+        valid: false,
+        sitekey: '6Lf7OUIUAAAAAM56DMwL4YqZB77RRS9SYolHllM7'
       }
     },
-    // recaptcha loader
-    created: () => {
-      let recaptchaScript = document.createElement('script')
-      recaptchaScript.setAttribute('src', 'https://www.google.com/recaptcha/api.js')
-      document.head.appendChild(recaptchaScript)
-    },
-    submit: () => {
-      if (this.$refs.form.validate()) {
-        axios.post('/api/submit', {
-          name: this.name,
-          email: this.email,
-          select: this.select,
-          checkbox: this.checkbox
-        })
+    methods: {
+      onSubmit (recaptchaResponse) {
+        if (this.$refs.form.validate()) {
+          const emailRegistrationEndpoint = 'http://localhost:8000/authenticate/email/register'
+          const fd = new FormData()
+          fd.append('full_name', this.fullName)
+          fd.append('email', this.email)
+          fd.append('password', this.password)
+          fd.append('retype_password', this.retypePassword)
+          fd.append('g_recaptcha_response', recaptchaResponse)
+          axios.post(emailRegistrationEndpoint, fd)
+            .then(function (result) {
+              console.log(result)
+            }, function (error) {
+              console.log(error.response.data)
+            })
+        }
+      },
+      onVerify (response) {
+        this.$refs.invisibleRecaptcha.execute()
+        this.onSubmit(response)
+      },
+      onExpired () {
+        console.log('Expired')
+      },
+      resetRecaptcha () {
+        this.$refs.recaptcha.reset() // Direct call reset method
       }
-    }
+    },
+    components: { VueRecaptcha }
   }
 </script>
 
